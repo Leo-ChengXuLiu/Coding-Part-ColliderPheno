@@ -1,0 +1,297 @@
+schema_version: tc_10tev_hybrid_role_complete_plot_contract_v1
+
+scope:
+  description: >-
+    Configuration used for the 10 TeV muon-collider tc Hybrid Role-Complete
+    BDT reference and mediator-reach plots.
+  collider: mu+ mu-
+  sqrt_s_gev: 10000
+  beam_energy_gev: [5000, 5000]
+  luminosity_fb_inv: 10000
+  model: hybrid_role_complete
+  scaler: null
+  note: >-
+    This records the samples used by the existing plots. The coherent 4q and
+    4q+gamma background replacement under validation is not retroactively
+    included here.
+
+samples:
+  reference_signal:
+    process: mu+ mu- > t cbar plus tbar c
+    model: tc_smeft_UFO
+    top_decay: fully_hadronic
+    generated_events: 100000
+    reference_coefficient_at_lambda_10tev: 0.032
+    expected_no_cut_yield_at_10ab: 847
+  offshell_backgrounds:
+    qq_light: {generated_events: 200000, expected_no_cut_yield_at_10ab: 35600}
+    cc:       {generated_events: 200000, expected_no_cut_yield_at_10ab: 17300}
+    bb:       {generated_events: 200000, expected_no_cut_yield_at_10ab: 9137}
+    tt:       {generated_events: 200000, expected_no_cut_yield_at_10ab: 7152, decay: fully_hadronic}
+    WW:       {generated_events: 500000, expected_no_cut_yield_at_10ab: 251000, decay: fully_hadronic}
+    Wjj:      {generated_events: 500000, expected_no_cut_yield_at_10ab: 355000, decay: W_fully_hadronic}
+    ZZ:       {generated_events: 200000, expected_no_cut_yield_at_10ab: 15200, decay: quarks}
+  onshell_plot_samples:
+    signal: mu+ mu- > t cbar a plus tbar c a
+    backgrounds:
+      - u ubar a
+      - d dbar a
+      - s sbar a
+      - c cbar a
+      - b bbar a
+      - t tbar a
+      - W+ W- a
+      - W jj a
+      - Z Z a
+    tagged_photon: {pt_min_gev: 20, abs_eta_max: 5.0, eflow_match_dr: 0.1}
+
+generation:
+  common_jet_cuts: {pt_min_gev: 20, abs_eta_max: 5.0, delta_r_jj_min: 0.4}
+  shower: {generator: Pythia8, tune: Monash_2013, mpi: false}
+  offshell: {isr: false, lepton_pdf: false}
+  onshell:
+    matrix_element_photon: true
+    photon_cuts: {pt_min_gev: 20, abs_eta_max: 5.0, delta_r_photon_jet_min: 0.4}
+    isr: true
+    lepton_pdf: true
+    qed_shower_by_lepton: true
+
+event_weights:
+  physics_weight: expected_no_cut_yield_at_10ab / generated_events
+  split_evaluation: >-
+    Within each process, validation and test physics weights are rescaled so
+    each split represents the full expected 10 ab^-1 yield.
+  stage1_training: >-
+    For each role head and OOF fold, weight every (process,binary_target) cell
+    inversely to its raw size; normalize the positive and negative target
+    classes to equal total weight.
+  stage2_training: >-
+    Preserve relative physics weights inside signal and background separately,
+    then normalize the two classes to equal total training weight.
+  evaluation: physics weights only; no class-balancing weights
+
+jet_definition:
+  input: Delphes reconstructed particle-flow candidates
+  algorithm: FastJet ee_genkt
+  p: 1.0
+  radius: 0.10
+  jet_energy_min_gev: 500
+  ordering: j1 and j2 are the two highest-energy accepted jets
+  roles: HJ is the larger-mass member of (j1,j2); LJ is the other member
+  truth_use: >-
+    Hadron-level b/c/light matching is used only as a Stage-1 target and audit
+    field; no truth or process identifier is a BDT input.
+
+preselection:
+  common:
+    min_jets_with_energy_above_500gev: 2
+    max_jets: null
+    reconstructed_leptons_with_energy_above_100gev: 0
+  reference_group2_cut1_lite:
+    mjj_min_gev: 7000
+  mediator_scan_offshell:
+    mjj_min_gev: 0
+    tagged_photon_required: false
+  mediator_scan_onshell:
+    mjj_min_gev: 0
+    tagged_photon_required: true
+  not_preselection:
+    - no HJ mass window
+    - no LJ mass cut
+    - no b-tag cut
+
+split:
+  method: deterministic process-stratified SHA256 event hash
+  train_fraction: 0.60
+  validation_fraction: 0.20
+  test_fraction: 0.20
+  split_seed_reference: 20260723
+  oof_folds: 5
+  leakage_policy: >-
+    Training rows receive strictly out-of-fold Stage-1 scores. Validation and
+    test rows receive the mean prediction of the five training-fold models.
+
+stage1:
+  heads:
+    - {role: HJ, target: b_vs_rest, output: hj_role_p_b_oof}
+    - {role: LJ, target: c_vs_rest, output: lj_role_p_c_oof}
+    - {role: LJ, target: b_vs_rest, output: lj_role_p_b_oof}
+  xgboost:
+    objective: binary:logistic
+    n_estimators: 600
+    max_depth: 6
+    learning_rate: 0.035
+    min_child_weight: 1.0
+    subsample: 0.90
+    colsample_bytree: 0.90
+    reg_lambda: 1.5
+    reg_alpha: 0.0
+    tree_method: hist
+    eval_metric: logloss
+
+stage2:
+  target: signal_vs_all_backgrounds
+  feature_count: 189
+  composition: 67 event features plus 58 HJ features plus 58 LJ features plus 6 OOF role features
+  xgboost:
+    objective: binary:logistic
+    n_estimators: 700
+    max_depth: 5
+    learning_rate: 0.035
+    min_child_weight: 2.0
+    subsample: 0.90
+    colsample_bytree: 0.90
+    reg_lambda: 2.0
+    reg_alpha: 0.0
+    tree_method: hist
+    eval_metric: logloss
+
+threshold:
+  data_split: validation only
+  candidates: 1001 quantiles of the validation BDT score
+  objective: minimize the numerically evaluated two-sigma coefficient reach
+  significance: Z = S / sqrt(S + B)
+  signal_scaling_for_reference_eft: S(C) = S(Cref) * (C/Cref)^2
+  requirements:
+    minimum_signal_efficiency: 0.05
+    minimum_raw_signal_events: 50
+    minimum_raw_background_events: 20
+  tie_breakers: [larger_Z, larger_S_over_B]
+  reference_group2_threshold: 0.9815372693538664
+  test_policy: the test split is evaluated once at the frozen validation threshold
+
+ordered_features:
+  event_67:
+    - njet_all
+    - njet_e500
+    - nlepton_prompt_iso
+    - n_visible
+    - n_charged
+    - n_neutral
+    - visible_e
+    - visible_pt
+    - visible_mass
+    - missing_e
+    - missing_pt
+    - missing_mass
+    - thrust
+    - thrust_major
+    - thrust_minor
+    - sphericity
+    - aplanarity
+    - c_parameter
+    - d_parameter
+    - j1_mass
+    - j1_energy
+    - j1_pt
+    - j1_eta
+    - j1_rapidity
+    - j1_phi
+    - j1_cos_theta
+    - j2_mass
+    - j2_energy
+    - j2_pt
+    - j2_eta
+    - j2_rapidity
+    - j2_phi
+    - j2_cos_theta
+    - hj_mass
+    - hj_energy
+    - hj_pt
+    - hj_eta
+    - hj_rapidity
+    - hj_phi
+    - hj_cos_theta
+    - lj_mass
+    - lj_energy
+    - lj_pt
+    - lj_eta
+    - lj_rapidity
+    - lj_phi
+    - lj_cos_theta
+    - mjj
+    - ejj
+    - ptjj
+    - yjj
+    - delta_phi_jj
+    - delta_eta_jj
+    - delta_y_jj
+    - delta_r_jj
+    - opening_angle_jj
+    - acoplanarity_jj
+    - energy_asymmetry
+    - pt_asymmetry
+    - mass_asymmetry
+    - abs_cos_theta_hj
+    - roe_n_candidates
+    - roe_energy
+    - roe_candidate_fraction
+    - roe_energy_fraction
+    - hj_lj_candidate_fraction
+    - hj_lj_energy_fraction
+  jet_58:
+    - mass
+    - energy
+    - pt
+    - eta
+    - rapidity
+    - cos_theta
+    - n_constituents
+    - n_charged
+    - n_neutral
+    - n_photon
+    - n_electron
+    - n_muon
+    - charged_energy_fraction
+    - neutral_energy_fraction
+    - em_energy_fraction
+    - had_energy_fraction
+    - lead_constituent_fraction
+    - ptd
+    - girth
+    - width
+    - jet_charge_k03
+    - jet_charge_k05
+    - jet_charge_k10
+    - tau1
+    - tau2
+    - tau3
+    - tau21
+    - tau32
+    - ecf1
+    - ecf2
+    - ecf3
+    - c2
+    - d2
+    - n2
+    - softdrop_mass
+    - softdrop_zg
+    - softdrop_rg
+    - n_soft_electrons
+    - n_soft_muons
+    - soft_lepton_ptrel_max
+    - n_ip_tracks
+    - n_ip2d_sig_gt2
+    - n_ip2d_sig_gt3
+    - n_ip3d_sig_gt2
+    - n_ip3d_sig_gt3
+    - ip2d_sig_abs_max
+    - ip2d_sig_abs_second
+    - ip2d_sig_abs_mean
+    - ip2d_sig_abs_median
+    - ip2d_sig_abs_sum
+    - ipz_sig_abs_max
+    - ipz_sig_abs_mean
+    - ip3d_sig_abs_max
+    - ip3d_sig_abs_second
+    - ip3d_sig_abs_mean
+    - ip3d_sig_abs_sum
+    - displaced_track_pt_fraction_sig2
+    - displaced_track_energy_fraction_sig2
+  role_oof_6:
+    - hj_role_p_b_oof
+    - lj_role_p_c_oof
+    - lj_role_p_b_oof
+    - lj_role_c_over_b_log_score_oof
+    - tc_role_score_product_oof
+    - tc_role_score_contrast_oof

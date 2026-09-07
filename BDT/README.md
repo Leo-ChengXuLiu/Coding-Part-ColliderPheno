@@ -53,6 +53,11 @@ event_id | role | truth_flavor | <jet features...>
 `split` must be one of `train`, `validation`, or `test`. The caller controls the
 split and therefore remains responsible for defining an appropriate independent test set.
 
+The exact 10 TeV tc plot contract is provided separately:
+
+- [feature definitions](FEATURE_DEFINITIONS.md);
+- [samples, weights, selection, training parameters, threshold rule, and ordered feature lists](configs/tc_10tev_plot_contract.yaml).
+
 ## Usage
 
 ```python
