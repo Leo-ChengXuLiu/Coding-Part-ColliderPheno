@@ -101,9 +101,4 @@ model. Threshold fitting and physical source normalization are outside this API.
 This package documents the verified contract, not every production detail.
 Datasets, event generation, detector payloads, source normalization, significance,
 reach calculations, cluster workflow, and trained-model directories stay outside
-the repository. The detector proxy is not a BIB or detector-systematics result;
-the six historical backgrounds do not establish a complete Standard Model study.
-Exact historical score reproduction needs the private fitted model or identical
-training rows, order, weights, and software. Synthetic tests verify the interface
-and recipe; they make no physics-performance claim. An independently reproducible
-detector response and event-membership replay are not established by this package.
+the repository.
