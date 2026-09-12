@@ -78,3 +78,8 @@ new_scores = model.predict_proba(new_events, new_jets)
 
 The implementation intentionally leaves feature definitions, event selection,
 sample weighting, and physics interpretation to the analysis using the model.
+
+## Other reference baselines
+
+- [R015 single-stage T0](baselines/t0_r015/): an independent 18-input event BDT
+  with its verified historical training recipe, feature definitions, and contract.
