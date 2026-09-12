@@ -6,10 +6,7 @@ inputs. The existing [Hybrid Role-Complete model](../../README.md) is independen
 
 The [ordered feature definitions](FEATURE_DEFINITIONS.md) and
 [contract](configs/t0_r015_contract.yaml) were checked against the formal feature
-producer, training code, threshold receipt, environment receipt, and native model.
-The formal model SHA-256 is
-`2a525900d86d1ad3d56cd32d5976d48ab31b23000cfb142980a43f8df4298036`.
-This is provenance for the reference contract; fitted weights are not distributed.
+producer, training code, threshold receipt, environment receipt, and native model. 
 
 ## Objects and inputs
 
