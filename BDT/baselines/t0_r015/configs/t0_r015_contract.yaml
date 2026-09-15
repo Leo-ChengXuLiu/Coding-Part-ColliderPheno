@@ -1,0 +1,147 @@
+schema_version: t0_r015_reference_contract_v1
+
+scope:
+  model: single_stage_event_xgboost
+  collider: mu+ mu-
+  sqrt_s_gev: 10000
+  beam_energy_gev: [5000, 5000]
+  detector_context: no-BIB Delphes reconstruction proxy
+  formal_model_sha256: 2a525900d86d1ad3d56cd32d5976d48ab31b23000cfb142980a43f8df4298036
+  fitted_weights_included: false
+
+jet_definition:
+  input: complete persisted pre-isolation EFlowTrack/EFlowPhoton/EFlowNeutralHadron
+  algorithm: FastJet ee_genkt
+  p: 1.0
+  radius: 0.15
+  recombination: E_scheme
+  track_mass_gev: 0.13957039
+  photon_and_neutral_hadron_mass_gev: 0.0
+  ordering: descending (E, px, py, pz), sequential jet index
+  roles: larger-mass accepted jet is HJ; other is LJ; mass ties use smaller jet index
+  substructure: all constituents; 3D opening angles; beta=1; no grooming
+
+preselection:
+  jet_energy_gev: strictly greater than 500
+  accepted_jet_count: exactly 2
+  dijet_mass_gev: strictly greater than 8000
+  reconstructed_jet_eta_cut: null
+  additional_mass_window: null
+  isolated_lepton_veto: false
+  flavor_tag_cut: false
+
+input:
+  interface: named xgboost.DMatrix
+  numpy_dtype: float64
+  target_dtype: int8
+  missing: native NaN; missing=np.nan; no imputation
+  infinite_values: rejected
+  scaler: null
+  ordered_features:
+    - M_HJ
+    - M_LJ
+    - D2_LJ
+    - E_HJ
+    - E_LJ
+    - abs_cos_theta_HJ
+    - abs_cos_theta_LJ
+    - D2_HJ
+    - constituent_multiplicity_HJ
+    - constituent_multiplicity_LJ
+    - track_multiplicity_HJ
+    - track_multiplicity_LJ
+    - charged_energy_fraction_HJ
+    - charged_energy_fraction_LJ
+    - jet_girth_HJ
+    - jet_girth_LJ
+    - tau21_HJ
+    - tau21_LJ
+  definitions: ../FEATURE_DEFINITIONS.md
+
+training:
+  target: signal=1 versus all six historical backgrounds=0
+  signal_process: mu+ mu- -> t cbar plus tbar c
+  background_families: [ttbar, qq_light, cc, bb, WW, ZZ]
+  selected_rows:
+    signal: 1215
+    ttbar: 1283
+    qq_light: 1289
+    cc: 1074
+    bb: 1005
+    WW: 2440
+    ZZ: 2793
+  total_selected_rows: 11099
+  weights:
+    signal_preliminary: 1 / N_signal_selected_train
+    background_preliminary: 1 / (6 * N_family_selected_train)
+    common_rescaling: N_total_selected_train / sum(preliminary_weights)
+    totals: signal=N_total/2; all backgrounds=N_total/2; each background=N_total/12
+    api: explicit caller sample_weight; no hidden reweighting
+    physical_cross_section_weights_used_for_training: false
+  num_boost_round: 85
+  early_stopping: false
+  xgboost:
+    objective: binary:logistic
+    tree_method: hist
+    eval_metric: logloss
+    nthread: 1
+    seed: 314159
+    reg_lambda: 1.0
+    reg_alpha: 0.0
+    subsample: 0.9
+    colsample_bytree: 0.9
+    scale_pos_weight: 1.0
+    max_depth: 4
+    min_child_weight: 5.0
+    eta: 0.08
+  unspecified_parameters: XGBoost 3.3.0 defaults
+  training_monitor: training logloss only; no validation-based round selection
+
+data_roles:
+  split_population: complete source events, before reconstruction selection
+  signal_ttbar: >-
+    Preserve 3562 historical memberships; extend the remaining 6438 identities
+    by SHA256 identity rank with fixed train/development/test slices 3863/1288/1287.
+    Combined source counts are 6000/2000/2000 across signal and ttbar.
+  other_five_backgrounds: >-
+    Within each process sort SHA256(salt|process_id|event_key), then lexical
+    event_key ties; cut at floor(0.6*N) and floor(0.8*N).
+  train: original source training partition only, after preselection
+  development: original source development partition only, threshold freeze
+  evaluation: original evaluation partition and two later auxiliary batches, after freeze
+  auxiliary: acceptance constraints only; never training or development
+  caution: historically inspected samples; not an unseen confirmatory test
+  public_replay: private identities and salts omitted; caller supplies independent partitions
+
+historical_working_point:
+  value: 0.7963983416557312
+  pass_rule: score >= threshold
+  selection_split: development only
+  background_acceptance_cap: 0.005
+  acceptance_denominator: complete development source population including selection failures
+  selection_weights: physical per-source cross-section weights, not training weights
+  candidates: positive infinity plus each distinct observed development score
+  objective: maximize selected weighted signal subject to the background acceptance cap
+  tie_breakers: larger selected weighted background, then lower threshold
+  cap_numeric_tolerance: 1.0e-15
+  score_ties: group identical scores; inclusive threshold
+  frozen_before_evaluation_access: true
+  interpretation: historical analysis working point, not a calibrated probability threshold
+  transfer_to_new_fits: not established
+
+historical_software:
+  python: 3.12.3
+  numpy: 2.5.1
+  pandas: 3.0.5
+  xgboost: 3.3.0
+  fastjet: 3.4.0
+  numerical_threads: 1
+
+limitations:
+  - No datasets, fitted weights, detector payloads, generation or cluster workflows.
+  - Source normalization and significance/reach calculations are outside the package.
+  - Exact historical membership and row-order replay requires private input artifacts.
+  - Independent detector-response reproduction is not established by this package.
+  - Same historical fit across software versions or different data is not established.
+  - Six historical families do not establish a complete Standard Model background study.
+  - Synthetic tests establish API and recipe behavior, not physics performance.
