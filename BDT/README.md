@@ -31,7 +31,7 @@ flowchart LR
     HB --> OOF[OOF role scores]
     LC --> OOF
     LB --> OOF
-    RAW[Event and raw HJ/LJ features] --> EVT[Hybrid Role-Complete event BDT]
+    RAW[Event and raw HJ/LJ features] --> EVT[BDT classifier]
     OOF --> EVT
     EVT --> P[Signal probability]
 ```
